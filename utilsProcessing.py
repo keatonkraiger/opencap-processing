@@ -222,6 +222,8 @@ def segment_STS(ikFilePath, pelvis_ty=None, timeVec=None, velSeated=0.3,
     return (risingTimes, risingTimesDelayedStart, 
             risingSittingTimesDelayedStartPeriodicEnd)
 
+
+    
 # %% Generate model with adjusted muscle wrapping to prevent unrealistic
 # wrapping giving rise to bad muscle-tendon lengths and moment arms. Changes
 # are made for the gmax1, iliacus, and psoas. Changes are documented in

@@ -39,6 +39,7 @@ opensimADDir = os.path.join(baseDir, 'UtilsDynamicSimulations', 'OpenSimAD')
 sys.path.append(baseDir)
 sys.path.append(opensimADDir)
 
+
 from utilsOpenSimAD import processInputsOpenSimAD, plotResultsOpenSimAD
 from mainOpenSimAD import run_tracking
 
@@ -110,6 +111,8 @@ Please contact us for any questions: https://www.opencap.ai/#contact
 session_type = 'overground' # Options are 'overground' and 'treadmill'.
 session_id = "4d5c3eb1-1a59-4ea1-9178-d3634610561c"
 case = '0' # Change this to compare across settings.
+
+breakpoint()
 # Options are 'squat', 'STS', and 'jump'.
 if session_type == 'overground': 
     trial_name = 'STS'

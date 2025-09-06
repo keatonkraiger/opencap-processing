@@ -13,3 +13,12 @@ UtilsDynamicSimulations/OpenSimAD/build-ExpressionGraphF*
 UtilsDynamicSimulations/OpenSimAD/build-ExternalFunctionF*
 UtilsDynamicSimulations/OpenSimAD/install-ExternalFunctionF*
 UtilsDynamicSimulations/OpenSimAD/opensimAD-install/*
+
+CMakeFiles
+cmake_install.cmake
+CMakeCache.txt
+Makefile
+settings_test.pkl
+.env
+
+

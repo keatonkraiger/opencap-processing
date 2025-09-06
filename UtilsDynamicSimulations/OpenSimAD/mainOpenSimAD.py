@@ -33,17 +33,9 @@ import platform
 import copy
 import pandas as pd
 
-# %% Settings.
 def run_tracking(baseDir, dataDir, subject, settings, case='0',
                  solveProblem=True, analyzeResults=True, writeGUI=True,
                  computeKAM=True, computeMCF=True):
-    
-    # %% Settings.
-    # Most available settings are left from trying out different formulations 
-    # when solving the trajectory optimization problems. We decided to keep
-    # them in this script in case users want to play with them or use them as
-    # examples for creating their own formulations.    
-    
     # Cost function weights.
     weights = {
         'jointAccelerationTerm': settings['weights']['jointAccelerationTerm'],
@@ -343,7 +335,6 @@ def run_tracking(baseDir, dataDir, subject, settings, case='0',
         contact_side = settings['contact_side']
 
     print('Processing {} - Case {}'.format(trialName, case))
-
     # %% Paths and dirs.
     pathMain = os.getcwd()
     pathSubjectData = os.path.join(dataDir, subject)
@@ -370,7 +361,7 @@ def run_tracking(baseDir, dataDir, subject, settings, case='0',
     # Dump settings in yaml file.
     with open(pathSettings, 'w') as file:
         yaml.dump(settings, file)
-    
+   
     # %% Muscles.
     # This section specifies the muscles and some of their parameters. This is
     # specific to the Rajagopal musculoskeletal model.
