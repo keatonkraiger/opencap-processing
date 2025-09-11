@@ -84,7 +84,7 @@ def main(args):
     
     # Options are 'squat', 'STS', and 'jump'.
     if session_type == 'overground': 
-        trial_name = 'STS'
+        trial_name = args.trial_name
         if trial_name == 'squat': # Squat
             motion_type = 'squats'
             repetition = 1
@@ -94,6 +94,9 @@ def main(args):
         elif trial_name == 'jump': # Jump  
             motion_type = 'jumping'
             time_window = [1.3, 2.2]
+        else:
+            motion_type = 'other'
+            time_window = [args.start_time, args.stop_time]
     # Options are 'walk_1_25ms', 'run_2_5ms', and 'run_4ms'.
     elif session_type == 'treadmill': 
         #trial_name = 'walk_1_25ms'
@@ -155,13 +158,12 @@ def main(args):
       
     settings = processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name, 
                                     motion_type, time_window, repetition,
-                                    treadmill_speed, contact_side, overwrite=True)
+                                    treadmill_speed, contact_side, overwrite=True, subject=args.subject)
 
     # %% Simulation.
     run_tracking_custom(baseDir, dataFolder, session_id, settings, case=case, 
                 solveProblem=solveProblem, analyzeResults=analyzeResults)
 
-    breakpoint()
     # Save settings 
     import pickle
     with open('settings_test.pkl', 'wb') as f:
@@ -171,13 +173,16 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run OpenSimAD simulations.')
-    parser.add_argument('--session_type', type=str, default='treadmill', 
+    parser.add_argument('--session_type', type=str, default='overground', 
                         choices=['overground', 'treadmill'], help="Overground or treadmill")
     parser.add_argument('--session_path', type=str, default='',
                         help="Path to the session folder. If empty, will use session_id.")
     parser.add_argument('--session_id', type=str, required=True,
                             help="Session ID")
     parser.add_argument('--case', type=str, default='0',help="Case ID")
-    parser.add_argument('--time', type=float, default=4.0, help="Time of the 20s clippet to run. Start with a few seconds.")
+    parser.add_argument('--start_time', type=float, default=0.0, help="Time of the 20s clippet to run. Start with a few seconds.")
+    parser.add_argument('--trial_name', type=str, default='STS', help="Trial name")
+    parser.add_argument('--stop_time', type=float, default=5.0, help="Time of the 20s clippet to run. Start with a few seconds.")
+    parser.add_argument('--subject', type=str, default='1', help="Subject ID")
     args = parser.parse_args()
     main(args)

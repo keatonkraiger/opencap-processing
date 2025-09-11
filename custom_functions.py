@@ -30,11 +30,11 @@ def download_file_2(url, file_name):
 def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
                            motion_type, time_window=[], repetition=None,
                            treadmill_speed=0, contact_side='all',
-                           overwrite=False, useExpressionGraphFunction=True):
+                           overwrite=False, useExpressionGraphFunction=True, subject='1'):
        
     # Download kinematics and model.    
-    pathTrial = os.path.join(dataFolder, 'OpenSimData', 'Kinematics', trial_name + '.mot') 
-  
+    pathTrial = os.path.join(dataFolder, 'OpenSimData', 'Kinematics', session_id + '.mot') 
+ 
     assert os.path.exists(pathTrial), \
         "Kinematic data not found"
 
@@ -92,7 +92,7 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
             time_window[0] = motion_file['time'][0]
         if time_window[1] > motion_file['time'][-1]:
             time_window[1] = motion_file['time'][-1]
-            
+           
     settings['timeInterval'] = time_window
     
     # Get demographics.    
@@ -248,7 +248,7 @@ def generate_model_with_contacts_custom(
     model.printToXML(pathOutputModel)
     
 def adjust_muscle_wrapping_custom(
-        baseDir, dataDir, OpenSimModel="LaiUhlrich2022",
+        baseDir, dataDir, OpenSimModel="LaiUhlrich2022_Vicon_39",
         overwrite=True):
     # Paths
     osDir = os.path.join(dataDir, 'OpenSimData')
