@@ -30,7 +30,7 @@ def download_file_2(url, file_name):
 def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
                            motion_type, time_window=[], repetition=None,
                            treadmill_speed=0, contact_side='all',
-                           overwrite=False, useExpressionGraphFunction=True, subject='1'):
+                           overwrite=False, useExpressionGraphFunction=True, subject='1', multiple_contacts=False):
        
     # Download kinematics and model.    
     pathTrial = os.path.join(dataFolder, 'OpenSimData', 'Kinematics', session_id + '.mot') 
@@ -53,10 +53,17 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
     # Adjust muscle wrapping.    
     adjust_muscle_wrapping_custom(baseDir, dataFolder ,
                          OpenSimModel=OpenSimModel, overwrite=True)
+    
     # Add foot-ground contacts to musculoskeletal model.    
-    generate_model_with_contacts_custom(dataFolder,
-                              OpenSimModel=OpenSimModel, overwrite=overwrite,
-                              contact_side=contact_side)
+    if multiple_contacts: 
+        generate_model_with_multiple_contacts_custom(dataFolder,
+                                OpenSimModel=OpenSimModel, overwrite=overwrite,
+                                contact_side=contact_side)
+    else:
+        generate_model_with_contacts_custom(dataFolder,
+                                OpenSimModel=OpenSimModel, overwrite=overwrite,
+                                contact_side=contact_side)
+    
     # Generate external function.    
     generateExternalFunction_custom(baseDir, dataFolder,
                              OpenSimModel=OpenSimModel,
@@ -116,7 +123,150 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
     
     return settings
 
+def generate_model_with_multiple_contacts_custom(
+        dataDir, OpenSimModel="LaiUhlrich2022", 
+        setPatellaMasstoZero=True, contact_side=None, overwrite=False, num_contact_planes=3):
+   
+    osDir = os.path.join(dataDir, 'OpenSimData')
+    pathModelFolder = os.path.join(osDir, 'Model')
+    suffix_MA = '_adjusted'
+    outputModelFileName = (OpenSimModel + "_scaled" + suffix_MA)
+    pathOutputFiles = os.path.join(pathModelFolder, outputModelFileName)    
 
+    # Return error is side is not None, 'right', or 'left'.
+    if contact_side not in ['all', 'right', 'left']:
+        raise ValueError('side must be "all", "right", or "left"')
+    
+    if contact_side == 'all':
+        pathOutputModel = pathOutputFiles + "_multi_contacts.osim"
+    else:
+        pathOutputModel = pathOutputFiles + "_contacts_" + contact_side + ".osim"
+    
+    if overwrite is False and os.path.exists(pathOutputModel):
+        return
+    else:
+        print('Add foot-ground contacts.')
+        
+    # The parameters of the foot-ground contacts are based on previous work. We
+    # scale the contact sphere locations based on foot dimensions.
+    reference_contact_spheres = {
+        "s1_r": {"radius": 0.032, "location": np.array([0.0019011578840796601,   -0.01,  -0.00382630379623308]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_r"},
+        "s2_r": {"radius": 0.032, "location": np.array([0.14838639994206301,     -0.01,  -0.028713422052654002]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_r"},
+        "s3_r": {"radius": 0.032, "location": np.array([0.13300117060705099,     -0.01,  0.051636247344956601]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_r"},
+        "s4_r": {"radius": 0.032, "location": np.array([0.066234666199163503,    -0.01,  0.026364160674169801]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_r"},
+        "s5_r": {"radius": 0.032, "location": np.array([0.059999999999999998,    -0.01,  -0.018760308461917698]), "orientation": np.array([0, 0, 0]), "socket_frame": "toes_r" },
+        "s6_r": {"radius": 0.032, "location": np.array([0.044999999999999998,    -0.01,  0.061856956754965199]), "orientation": np.array([0, 0, 0]), "socket_frame": "toes_r" },
+        "s1_l": {"radius": 0.032, "location": np.array([0.0019011578840796601,   -0.01,  0.00382630379623308]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_l"},
+        "s2_l": {"radius": 0.032, "location": np.array([0.14838639994206301,     -0.01,  0.028713422052654002]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_l"},
+        "s3_l": {"radius": 0.032, "location": np.array([0.13300117060705099,     -0.01,  -0.051636247344956601]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_l"},
+        "s4_l": {"radius": 0.032, "location": np.array([0.066234666199163503,    -0.01,  -0.026364160674169801]), "orientation": np.array([0, 0, 0]), "socket_frame": "calcn_l"},
+        "s5_l": {"radius": 0.032, "location": np.array([0.059999999999999998,    -0.01,  0.018760308461917698]), "orientation": np.array([0, 0, 0]), "socket_frame": "toes_l" },
+        "s6_l": {"radius": 0.032, "location": np.array([0.044999999999999998,    -0.01,  -0.061856956754965199]), "orientation": np.array([0, 0, 0]), "socket_frame": "toes_l" }}      
+    reference_scale_factors = {"calcn_r": np.array([0.91392399999999996, 0.91392399999999996, 0.91392399999999996]),
+                               "toes_r":  np.array([0.91392399999999996, 0.91392399999999996, 0.91392399999999996]),
+                               "calcn_l": np.array([0.91392399999999996, 0.91392399999999996, 0.91392399999999996]),
+                               "toes_l":  np.array([0.91392399999999996, 0.91392399999999996, 0.91392399999999996])}
+    # Create multiple contact planes to cover the surrounding area in a 3x3 grid.
+    reference_contact_half_space = [{"name": "floor", "location": np.array([0, 0, 0]),"orientation": np.array([0, 0, -np.pi/2]), "frame": "ground"}]
+    reference_contact_half_spaces = []
+    planes = 0
+    for i in range(-1, 2):
+        for j in range(-1, 2):
+            reference_contact_half_spaces.append({"name": f"floor_{planes}",
+                                   "location": np.array([i, 0, j]), "orientation": np.array([0, 0, -np.pi/2]), "frame": "ground"})
+            planes += 1
+           
+    stiffness = 1000000
+    dissipation = 2.0
+    static_friction = 0.8
+    dynamic_friction = 0.8
+    viscous_friction = 0.5
+    transition_velocity = 0.2
+    
+    # Add contact spheres and SmoothSphereHalfSpaceForces.
+    opensim.Logger.setLevelString('error')
+    model = opensim.Model(pathOutputFiles + ".osim")   
+    bodySet = model.get_BodySet()
+    
+    # ContactHalfSpace.
+    if reference_contact_half_space[0]["frame"] == "ground":
+        contact_half_space_frame = model.get_ground()
+    else:
+        raise ValueError('Not yet supported.')    
+   
+    contact_half_spaces = []
+    for half_space in reference_contact_half_spaces:
+        contact_half_space = opensim.ContactHalfSpace(
+            opensim.Vec3(half_space["location"]),
+            opensim.Vec3(half_space["orientation"]),
+            contact_half_space_frame, half_space["name"]
+        )
+        contact_half_space.connectSocket_frame(contact_half_space_frame)
+        model.addContactGeometry(contact_half_space)
+        contact_half_spaces.append(contact_half_space)
+   
+    # ContactSpheres and SmoothSphereHalfSpaceForces.
+    for ref_contact_sphere in reference_contact_spheres:
+
+        if contact_side == 'right' and '_l' in ref_contact_sphere:
+            continue
+        if contact_side == 'left' and '_r' in ref_contact_sphere:
+            continue
+
+        # ContactSpheres.
+        body = bodySet.get(reference_contact_spheres[ref_contact_sphere]["socket_frame"])
+        # Scale location based on attached_geometry scale_factors.      
+        # We don't scale the y_position.
+        attached_geometry = body.get_attached_geometry(0)
+        c_scale_factors = attached_geometry.get_scale_factors().to_numpy() 
+        c_ref_scale_factors = reference_scale_factors[reference_contact_spheres[ref_contact_sphere]["socket_frame"]]
+        scale_factors = c_ref_scale_factors / c_scale_factors        
+        scale_factors[1] = 1        
+        scaled_location = reference_contact_spheres[ref_contact_sphere]["location"] / scale_factors
+        c_contactSphere = opensim.ContactSphere(
+            reference_contact_spheres[ref_contact_sphere]["radius"],
+            opensim.Vec3(scaled_location), body, ref_contact_sphere)
+        c_contactSphere.connectSocket_frame(body)
+        model.addContactGeometry(c_contactSphere)
+        
+        # SmoothSphereHalfSpaceForces.
+        for contact_half_space in contact_half_spaces:
+            SmoothSphereHalfSpaceForce = opensim.SmoothSphereHalfSpaceForce(
+                "SmoothSphereHalfSpaceForce_" + ref_contact_sphere, 
+                c_contactSphere, contact_half_space)
+            SmoothSphereHalfSpaceForce.set_stiffness(stiffness)
+            SmoothSphereHalfSpaceForce.set_dissipation(dissipation)
+            SmoothSphereHalfSpaceForce.set_static_friction(static_friction)
+            SmoothSphereHalfSpaceForce.set_dynamic_friction(dynamic_friction)
+            SmoothSphereHalfSpaceForce.set_viscous_friction(viscous_friction)
+            SmoothSphereHalfSpaceForce.set_transition_velocity(transition_velocity)        
+            SmoothSphereHalfSpaceForce.connectSocket_half_space(contact_half_space)
+            SmoothSphereHalfSpaceForce.connectSocket_sphere(c_contactSphere)
+        model.addForce(SmoothSphereHalfSpaceForce)
+   
+    # We do not use the patella in the dynamic simulations. The reason is that
+    # the patella only matters for the muscle-tendon lengths and moment arms,
+    # but since we approximate those with polynomials, the patella is useless.
+    # We therefore remove it, since otherwise we would have to deal with
+    # kinematic constraints that would make things unecessarily complicated.
+    # We remove it when building the external function, and here we set its
+    # mass to zero such that we can make an apple-to-apple comparison when
+    # checking that the outputs from the external function match the results
+    # from ID ran with the model (with a mass set to 0, the patella will not
+    # influence ID).
+    if setPatellaMasstoZero:
+        for i in range(bodySet.getSize()):        
+            c_body = bodySet.get(i)
+            c_body_name = c_body.getName()            
+            if (c_body_name == 'patella_l' or c_body_name == 'patella_r'):
+                c_body.set_mass(0.)
+                c_body.set_inertia(opensim.Vec6(0))
+       
+    model.finalizeConnections
+    model.initSystem()
+    model.printToXML(pathOutputModel)
+  
+  
 def generate_model_with_contacts_custom(
         dataDir, OpenSimModel="LaiUhlrich2022", 
         setPatellaMasstoZero=True, contact_side=None, overwrite=False):

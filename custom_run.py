@@ -31,6 +31,7 @@ import yaml
 import scipy.interpolate as interpolate
 import platform
 import copy
+import time
 import pandas as pd
 
 def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
@@ -2661,6 +2662,7 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
                     os.path.join(pathResults, 'optimaltrajectories.npy'),
                     allow_pickle=True)   
             optimaltrajectories = optimaltrajectories.item()
+           
         optimaltrajectories[case] = {
             'coordinate_values_toTrack': refData_offset_nsc,
             'coordinate_values': Qs_opt_nsc,
@@ -2719,6 +2721,11 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
             optimaltrajectories[case]['muscle_forces'] = Ft_opt  
             optimaltrajectories[case]['passive_muscle_torques'] = pMT_opt
             optimaltrajectories[case]['passive_muscle_torques'] = aMT_opt
-                
+               
+        optimaltrajectories[case]['JTerms'] = JTerms
+        start_time = settings['start_time']
+        total_time = time.time() - start_time
+        optimaltrajectories[case]['total_time_min'] = total_time / 60
+        optimaltrajectories[case]['settings'] = settings
         np.save(os.path.join(pathResults, 'optimaltrajectories.npy'),
                 optimaltrajectories)

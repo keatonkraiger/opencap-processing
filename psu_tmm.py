@@ -151,16 +151,20 @@ def main(args):
         "time_window": time_window,
         "repetition": repetition,
         "treadmill_speed": treadmill_speed,
-        "contact_side": contact_side
+        "contact_side": contact_side,
+        "multiple_contacts": args.multiple_contacts
     }
     for key, value in session_details.items():
         print(f"{key}: {value}")
-      
+     
+    start_time = time.time() 
     settings = processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name, 
                                     motion_type, time_window, repetition,
-                                    treadmill_speed, contact_side, overwrite=True, subject=args.subject)
-
-    # %% Simulation.
+                                    treadmill_speed, contact_side, overwrite=True, subject=args.subject, multiple_contacts=args.multiple_contacts)
+    
+    settings['session_details'] = session_details
+    settings['start_time'] = start_time
+    
     run_tracking_custom(baseDir, dataFolder, session_id, settings, case=case, 
                 solveProblem=solveProblem, analyzeResults=analyzeResults)
 
@@ -168,6 +172,7 @@ def main(args):
     import pickle
     with open('settings_test.pkl', 'wb') as f:
         pickle.dump(settings, f)
+        
     # To compare different cases, add to the cases list, eg cases=['0','1'].
     plotResultsOpenSimAD_custom(dataFolder, session_id, trial_name, settings, cases=[case])
 
@@ -184,5 +189,6 @@ if __name__ == "__main__":
     parser.add_argument('--trial_name', type=str, default='STS', help="Trial name")
     parser.add_argument('--stop_time', type=float, default=5.0, help="Time of the 20s clippet to run. Start with a few seconds.")
     parser.add_argument('--subject', type=str, default='1', help="Subject ID")
+    parser.add_argument('--multiple_contacts', action='store_true', help="Use multiple contact planes under feet")
     args = parser.parse_args()
     main(args)
