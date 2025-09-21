@@ -9,11 +9,55 @@ import requests
 import shutil
 import casadi as ca
 import importlib
-
 from utilsProcessing import getMomentArms
-
 from utils import import_metadata, storage_to_dataframe, storage_to_numpy
 from settingsOpenSimAD import get_setup
+import re
+import pandas as pd
+
+# --- TRC parsing ---
+def parse_trc_header(lines):
+    """
+    Returns:
+      full_header: list of column names for pandas
+      marker_names: list of base marker names in order
+      marker_cols: dict mapping marker -> (colX, colY, colZ) exact names
+    """
+    # Row with marker names (e.g., "Frame#  Time  LHEE  LANK  ...")
+    marker_line = re.findall(r'\S+', lines[3])
+    marker_names = marker_line[2:]  # after Frame# and Time
+
+    # Row with coordinate labels (e.g., "X1 Y1 Z1 X2 Y2 Z2 ...")
+    coord_labels = re.findall(r'\S+', lines[4])
+    if len(coord_labels) != len(marker_names) * 3:
+        raise ValueError("TRC header mismatch: coord labels vs marker count")
+
+    full_header = ['Frame#', 'Time']
+    marker_cols = {}
+    for i, m in enumerate(marker_names):
+        x, y, z = coord_labels[i*3 : i*3 + 3]
+        cx, cy, cz = f"{m}_{x}", f"{m}_{y}", f"{m}_{z}"
+        full_header.extend([cx, cy, cz])
+        marker_cols[m] = (cx, cy, cz)
+
+    return full_header, marker_names, marker_cols
+
+def load_trc(trc_path, scale=1.0):
+    with open(trc_path, 'r') as f:
+        lines = f.readlines()
+    full_header, marker_names, marker_cols = parse_trc_header(lines)
+
+    df = pd.read_csv(trc_path, sep='\t', skiprows=5, header=None)
+    df = df.iloc[:, :len(full_header)]
+    df.columns = full_header
+
+    time = df['Time'].to_numpy()
+    markers = {}
+    for m in marker_names:
+        cx, cy, cz = marker_cols[m]
+        xyz = np.stack([df[cx].to_numpy(), df[cy].to_numpy(), df[cz].to_numpy()], axis=1)  # (N,3)
+        markers[m] = xyz * scale
+    return time, markers
 
 def download_file(url, file_name):
     
@@ -30,13 +74,15 @@ def download_file_2(url, file_name):
 def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
                            motion_type, time_window=[], repetition=None,
                            treadmill_speed=0, contact_side='all',
-                           overwrite=False, useExpressionGraphFunction=True, subject='1', multiple_contacts=False):
+                           overwrite=False, useExpressionGraphFunction=True, multiple_contacts=False, marker_data=None):
        
     # Download kinematics and model.    
     pathTrial = os.path.join(dataFolder, 'OpenSimData', 'Kinematics', session_id + '.mot') 
- 
-    assert os.path.exists(pathTrial), \
-        "Kinematic data not found"
+    # Check if pathTrial exists, if not, check if session_id_ik.mot exists.
+    if not os.path.exists(pathTrial):
+        pathTrial = os.path.join(dataFolder, 'OpenSimData', 'Kinematics', session_id + '_ik.mot') 
+        if not os.path.exists(pathTrial):
+            raise FileNotFoundError(f"Kinematics file not found at {pathTrial}. Please provide a valid path.")
 
     # Get metadata
     metadata = import_metadata(os.path.join(dataFolder, 'sessionMetadata.yaml'))
@@ -58,7 +104,7 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
     if multiple_contacts: 
         generate_model_with_multiple_contacts_custom(dataFolder,
                                 OpenSimModel=OpenSimModel, overwrite=overwrite,
-                                contact_side=contact_side)
+                                contact_side=contact_side, marker_data=marker_data)
     else:
         generate_model_with_contacts_custom(dataFolder,
                                 OpenSimModel=OpenSimModel, overwrite=overwrite,
@@ -76,6 +122,12 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
     settings = get_setup(motion_type)
     pathMotionFile = os.path.join(dataFolder, 'OpenSimData', 'Kinematics',
                                   trial_name + '.mot')
+    if not os.path.exists(pathMotionFile):
+        pathMotionFile = os.path.join(dataFolder, 'OpenSimData', 'Kinematics',
+                                  trial_name + '_ik.mot')
+        if not os.path.exists(pathMotionFile):
+            raise FileNotFoundError(f"Kinematics file not found at {pathMotionFile}. Please provide a valid path.")
+        
     if (repetition is not None and 
         (motion_type == 'squats' or motion_type == 'sit_to_stand')): 
         if motion_type == 'squats':
@@ -99,33 +151,94 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
             time_window[0] = motion_file['time'][0]
         if time_window[1] > motion_file['time'][-1]:
             time_window[1] = motion_file['time'][-1]
-           
+          
     settings['timeInterval'] = time_window
-    
-    # Get demographics.    
     settings['mass_kg'] = metadata['mass_kg']
     settings['height_m'] = metadata['height_m']
-    
-    # Treadmill speed.
     settings['treadmill_speed'] = treadmill_speed
-    
-    # Trial name
     settings['trial_name'] = trial_name
-    
-    # OpenSim model name
     settings['OpenSimModel'] = OpenSimModel
-
-    # Whether to use the expression graph function or (old) external function.
     settings['useExpressionGraphFunction'] = useExpressionGraphFunction
-
-    # Contact side
     settings['contact_side'] = contact_side
-    
     return settings
+
+def calculate_contact_tile_positions(mocap_data, reference_markers=['LHEE','LANK','LTOE','RHEE','RANK','RTOE'], 
+                                   tile_size=1.0, padding=0.5):
+    """
+    Calculate positions for contact tiles based on mocap data.
+    
+    Args:
+        mocap_data: Dictionary with marker_name -> [n, 3] arrays, or None
+        reference_markers: List of marker names to consider for foot positions
+        tile_size: Size of each tile in meters (default 1.0m x 1.0m)
+        padding: Additional padding around the foot trajectory bounds in meters
+        
+    Returns:
+        List of [x, z] positions for tile centers
+    """
+    positions = []
+    
+    # If no mocap data, place tiles near origin
+    if mocap_data is None:
+        # Create a small grid around origin for basic contact
+        positions = [
+            [-tile_size, -tile_size],
+            [0.0, -tile_size], 
+            [tile_size, -tile_size],
+            [-tile_size, 0.0],
+            [0.0, 0.0],
+            [tile_size, 0.0]
+        ]
+        return positions
+    
+    # Collect all relevant marker positions (x, y only)
+    all_foot_positions = []
+    
+    for marker_name in reference_markers:
+        if marker_name in mocap_data:
+            marker_data = mocap_data[marker_name]  # [n, 3] array
+            # Extract x, z coordinates for all frames
+            xz_positions = marker_data[:, [0, 2]]  # [n, 2]
+            all_foot_positions.append(xz_positions)
+    
+    if not all_foot_positions:
+        # Fallback if no reference markers found
+        return [[0.0, 0.0]]
+    
+    # Combine all positions
+    all_positions = np.vstack(all_foot_positions)  # [total_frames, 2]
+    
+    # Find bounds of all foot movements
+    min_x, min_z = np.min(all_positions, axis=0)
+    max_x, max_z = np.max(all_positions, axis=0)
+    
+    # Add padding
+    min_x -= padding
+    min_z -= padding
+    max_x += padding
+    max_z += padding
+
+    # Calculate how many tiles we need in each direction
+    x_range = max_x - min_x
+    z_range = max_z - min_z
+
+    tiles_x = int(np.ceil(x_range / tile_size))
+    tiles_z = int(np.ceil(z_range / tile_size))
+
+    # Generate tile positions
+    # Start from min bounds and place tiles to cover the area
+    for i in range(tiles_x):
+        for j in range(tiles_z):
+            # Calculate tile center position
+            tile_x = min_x + (i + 0.5) * tile_size
+            tile_z = min_z + (j + 0.5) * tile_size
+            positions.append([tile_x, tile_z])
+
+    return positions
 
 def generate_model_with_multiple_contacts_custom(
         dataDir, OpenSimModel="LaiUhlrich2022", 
-        setPatellaMasstoZero=True, contact_side=None, overwrite=False, num_contact_planes=3):
+        setPatellaMasstoZero=True, contact_side=None, overwrite=False, marker_data=None):
    
     osDir = os.path.join(dataDir, 'OpenSimData')
     pathModelFolder = os.path.join(osDir, 'Model')
@@ -170,11 +283,13 @@ def generate_model_with_multiple_contacts_custom(
     reference_contact_half_space = [{"name": "floor", "location": np.array([0, 0, 0]),"orientation": np.array([0, 0, -np.pi/2]), "frame": "ground"}]
     reference_contact_half_spaces = []
     planes = 0
-    for i in range(-1, 2):
-        for j in range(-1, 2):
-            reference_contact_half_spaces.append({"name": f"floor_{planes}",
-                                   "location": np.array([i, 0, j]), "orientation": np.array([0, 0, -np.pi/2]), "frame": "ground"})
-            planes += 1
+    
+   
+    tile_positions = calculate_contact_tile_positions(marker_data, tile_size=1.0, padding=0.5) 
+    for tile in tile_positions:
+        reference_contact_half_spaces.append({"name": f"floor_{planes}",
+                                "location": np.array([tile[0], 0, tile[1]]), "orientation": np.array([0, 0, -np.pi/2]), "frame": "ground"})
+        planes += 1
            
     stiffness = 1000000
     dissipation = 2.0

@@ -607,7 +607,12 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
     # %% Kinematic data to track.
     from utilsOpenSimAD import getIK, filterDataFrame
     from utilsOpenSimAD import interpolateDataFrame, selectDataFrame
+    
     pathIK = os.path.join(pathIKFolder, trialName + '.mot')
+    if not os.path.exists(pathIK):
+        pathIK = os.path.join(pathIKFolder, trialName + '_ik.mot')
+        if not os.path.exists(pathIK):
+            raise Exception('IK file not found: ' + pathIK)
     Qs_fromIK = getIK(pathIK, joints)
     # Filtering.
     if filter_Qs_toTrack:
@@ -1265,7 +1270,6 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
         # uw['Qsj'] = ca.vec(ubQsj_vec).full()
         # lw['Qsj'] = ca.vec(lbQsj_vec).full()
         
-    # %% Formulate optimal control problem.
     if solveProblem:
         J = 0 # initialize cost function.
         opti = ca.Opti() # initialize opti instance.            

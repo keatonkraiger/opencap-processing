@@ -11,7 +11,7 @@ sys.path.append(opensimADDir)
 
 
 from utilsOpenSimAD import plotResultsOpenSimAD, plotResultsOpenSimAD_custom
-from custom_functions import processInputsOpenSimAD_custom
+from custom_functions import processInputsOpenSimAD_custom, load_trc
 from custom_run import run_tracking_custom
 
 # %% User inputs.
@@ -78,72 +78,36 @@ Please contact us for any questions: https://www.opencap.ai/#contact
 '''
 
 def main(args):
-    session_type = args.session_type
     session_id = args.session_id
-    case = args.case if 'case' in args else '0'
+    case =  '0'
+    motion_type = 'other'
+    trial_name = args.session_id
+    time_window = [args.start_time, args.stop_time]
+    data_path = args.data_path
+     
+    if args.use_marker_contact:
+        # Load the trc file
+        trc_file = os.path.join(data_path, 'MarkerData', f'{trial_name}.trc')
+        if not os.path.exists(trc_file):
+            raise FileNotFoundError(f"TRC file not found at {trc_file}. Please provide a valid path if using mocap for contact placement.")
+        marker_times, markers = load_trc(trc_file, scale=1)
+        if marker_times[0] > time_window[0] or marker_times[-1] < time_window[1]:
+            raise ValueError(f"TRC file time range ({marker_times[0]} to {marker_times[-1]}) does not cover the specified time_window ({time_window[0]} to {time_window[1]}). Please provide a TRC file that covers the full time window.")
+       
+        indices = (marker_times >= time_window[0]) & (marker_times <= time_window[1])
+        marker_data = {}
+        for marker in markers:
+            marker_data[marker] = markers[marker][indices, :]
+    else:
+        marker_data = None
+        
     
-    # Options are 'squat', 'STS', and 'jump'.
-    if session_type == 'overground': 
-        trial_name = args.trial_name
-        if trial_name == 'squat': # Squat
-            motion_type = 'squats'
-            repetition = 1
-        elif trial_name == 'STS': # Sit-to-stand        
-            motion_type = 'sit_to_stand'
-            time_window = [0.0,args.time]
-        elif trial_name == 'jump': # Jump  
-            motion_type = 'jumping'
-            time_window = [1.3, 2.2]
-        else:
-            motion_type = 'other'
-            time_window = [args.start_time, args.stop_time]
-    # Options are 'walk_1_25ms', 'run_2_5ms', and 'run_4ms'.
-    elif session_type == 'treadmill': 
-        #trial_name = 'walk_1_25ms'
-        trial_name = 'Take_2_segment_0_ik'
-        torque_driven_model = False # Example with torque-driven model.
-        if trial_name == 'walk_1_25ms': # Walking, 1.25 m/s
-            motion_type = 'walking'
-            time_window = [1.0, 2.5]
-            treadmill_speed = 1.25
-        elif 'Take' in trial_name: # Walking, 1.25 m/s
-            motion_type = 'walking'
-            time_window = [4.0, 5.0]
-            treadmill_speed = 1.25   
-        elif trial_name == 'run_2_5ms': # Running, 2.5 m/s
-            if torque_driven_model:
-                motion_type = 'running_torque_driven'
-            else:
-                motion_type = 'running'
-            time_window = [1.4, 2.6]
-            treadmill_speed = 2.5
-        elif trial_name == 'run_4ms': # Running with periodic constraints, 4.0 m/s
-            motion_type = 'my_periodic_running'
-            time_window = [3.1833333, 3.85]
-            treadmill_speed = 4.0
-        
-    # Set to True to solve the optimal control problem.
     solveProblem = True
-    # Set to True to analyze the results of the optimal control problem. If you
-    # solved the problem already, and only want to analyze/process the results, you
-    # can set solveProblem to False and run this script with analyzeResults set to
-    # True. This is useful if you do additional post-processing but do not want to
-    # re-run the problem.
     analyzeResults = True
-
-    # Path to where you want the data to be downloaded.
-
-    # %% Setup. 
-    if not 'time_window' in locals():
-        time_window = None
-    if not 'repetition' in locals():
-        repetition = None
-    if not 'treadmill_speed' in locals():
-        treadmill_speed = 0
-    if not 'contact_side' in locals():
-        contact_side = 'all'
+    repetition = None
+    treadmill_speed = 0
+    contact_side = 'all'
         
-    dataFolder = args.session_path
     session_details = {
         "session_id": session_id,
         "trial_name": trial_name,
@@ -158,14 +122,14 @@ def main(args):
         print(f"{key}: {value}")
      
     start_time = time.time() 
-    settings = processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name, 
-                                    motion_type, time_window, repetition,
-                                    treadmill_speed, contact_side, overwrite=True, subject=args.subject, multiple_contacts=args.multiple_contacts)
+    settings = processInputsOpenSimAD_custom(baseDir, data_path, session_id, trial_name, 
+                                    motion_type, time_window, repetition, 
+                                    treadmill_speed, contact_side, overwrite=True, multiple_contacts=args.multiple_contacts, marker_data=marker_data)
     
     settings['session_details'] = session_details
     settings['start_time'] = start_time
-    
-    run_tracking_custom(baseDir, dataFolder, session_id, settings, case=case, 
+
+    run_tracking_custom(baseDir, data_path, session_id, settings, case=case, 
                 solveProblem=solveProblem, analyzeResults=analyzeResults)
 
     # Save settings 
@@ -174,21 +138,18 @@ def main(args):
         pickle.dump(settings, f)
         
     # To compare different cases, add to the cases list, eg cases=['0','1'].
-    plotResultsOpenSimAD_custom(dataFolder, session_id, trial_name, settings, cases=[case])
+    plotResultsOpenSimAD_custom(data_path, session_id, trial_name, settings, cases=[case])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run OpenSimAD simulations.')
-    parser.add_argument('--session_type', type=str, default='overground', 
-                        choices=['overground', 'treadmill'], help="Overground or treadmill")
-    parser.add_argument('--session_path', type=str, default='',
+    parser.add_argument('--data_path', type=str, default='',
                         help="Path to the session folder. If empty, will use session_id.")
     parser.add_argument('--session_id', type=str, required=True,
                             help="Session ID")
-    parser.add_argument('--case', type=str, default='0',help="Case ID")
     parser.add_argument('--start_time', type=float, default=0.0, help="Time of the 20s clippet to run. Start with a few seconds.")
-    parser.add_argument('--trial_name', type=str, default='STS', help="Trial name")
     parser.add_argument('--stop_time', type=float, default=5.0, help="Time of the 20s clippet to run. Start with a few seconds.")
-    parser.add_argument('--subject', type=str, default='1', help="Subject ID")
     parser.add_argument('--multiple_contacts', action='store_true', help="Use multiple contact planes under feet")
+    parser.add_argument('--use_marker_contact', action='store_true',
+                        help="Use marker data to position contact planes")
     args = parser.parse_args()
     main(args)
