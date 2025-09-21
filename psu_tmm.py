@@ -1,5 +1,6 @@
 # %% Directories, paths, and imports. You should not need to change anything.
 import os
+import pickle
 import sys
 import argparse
 import time
@@ -84,6 +85,7 @@ def main(args):
     trial_name = args.session_id
     time_window = [args.start_time, args.stop_time]
     data_path = args.data_path
+    overwrite = not args.no_overwrite
      
     if args.use_marker_contact:
         # Load the trc file
@@ -121,24 +123,25 @@ def main(args):
     for key, value in session_details.items():
         print(f"{key}: {value}")
      
+    output_dir = os.path.join('Results', data_path)
+    if time_window:
+        output_dir += f'/{int(time_window[0])}-{int(time_window[1])}s'
+    os.makedirs(output_dir, exist_ok=True)
     start_time = time.time() 
     settings = processInputsOpenSimAD_custom(baseDir, data_path, session_id, trial_name, 
                                     motion_type, time_window, repetition, 
-                                    treadmill_speed, contact_side, overwrite=True, multiple_contacts=args.multiple_contacts, marker_data=marker_data)
-    
+                                    treadmill_speed, contact_side, overwrite=overwrite, multiple_contacts=args.multiple_contacts, marker_data=marker_data)
+
     settings['session_details'] = session_details
     settings['start_time'] = start_time
-
-    run_tracking_custom(baseDir, data_path, session_id, settings, case=case, 
-                solveProblem=solveProblem, analyzeResults=analyzeResults)
-
     # Save settings 
-    import pickle
-    with open('settings_test.pkl', 'wb') as f:
+    with open(os.path.join(output_dir, 'settings.pkl'), 'wb') as f:
         pickle.dump(settings, f)
-        
+ 
+    run_tracking_custom(baseDir, data_path, session_id, settings, case=case, 
+                solveProblem=solveProblem, analyzeResults=analyzeResults, output_dir=output_dir)
     # To compare different cases, add to the cases list, eg cases=['0','1'].
-    plotResultsOpenSimAD_custom(data_path, session_id, trial_name, settings, cases=[case])
+    plotResultsOpenSimAD_custom(data_path, session_id, trial_name, settings, cases=[case], output_path=output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run OpenSimAD simulations.')
@@ -151,5 +154,7 @@ if __name__ == "__main__":
     parser.add_argument('--multiple_contacts', action='store_true', help="Use multiple contact planes under feet")
     parser.add_argument('--use_marker_contact', action='store_true',
                         help="Use marker data to position contact planes")
+    parser.add_argument('--no_overwrite', action='store_true',
+                        help="Do not overwrite existing results") 
     args = parser.parse_args()
     main(args)

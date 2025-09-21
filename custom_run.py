@@ -36,7 +36,7 @@ import pandas as pd
 
 def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
                  solveProblem=True, analyzeResults=True, writeGUI=True,
-                 computeKAM=True, computeMCF=True):
+                 computeKAM=True, computeMCF=True, output_dir=None):
     # Cost function weights.
     weights = {
         'jointAccelerationTerm': settings['weights']['jointAccelerationTerm'],
@@ -882,7 +882,6 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
     F_map = np.load(
         os.path.join(pathExternalFunctionFolder, 
                      F_name + '_map.npy'), allow_pickle=True).item()
-    
     # Indices outputs external function.
     if 'nContactSpheres' not in F_map['GRFs']:
         # We updated the code to make it more generic and allow for different
@@ -1866,6 +1865,11 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
                                          useExpressionGraphFunction)             
         np.save(os.path.join(pathResults, 'w_opt_{}.npy'.format(case)), w_opt)
         np.save(os.path.join(pathResults, 'stats_{}.npy'.format(case)), stats)
+        if output_dir:
+            solve_path = os.path.join(output_dir, 'solve_logs')
+            np.save(os.path.join(solve_path, 'w_opt_{}.npy'.format(case)), w_opt)
+            np.save(os.path.join(solve_path, 'stats_{}.npy'.format(case)), stats)
+            
         
     # %% Analyze results.
     if analyzeResults:
@@ -2730,3 +2734,7 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
         optimaltrajectories[case]['settings'] = settings
         np.save(os.path.join(pathResults, 'optimaltrajectories.npy'),
                 optimaltrajectories)
+        
+        if output_dir:
+            np.save(os.path.join(output_dir, 'optimaltrajectories.npy'),
+                    optimaltrajectories) 

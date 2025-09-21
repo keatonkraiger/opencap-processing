@@ -17,6 +17,7 @@ iphoneModel:
 markerAugmentationSettings:
   markerAugmenterModel: LSTM
 mass_kg: 68.0
-openSimModel: Subject7 
+generic_openSimModel: LaiUhlrich2022_Vicon_39
+scaled_openSimModel: Subject7
 posemodel: hrnet
 subjectID: treadmillExampleData

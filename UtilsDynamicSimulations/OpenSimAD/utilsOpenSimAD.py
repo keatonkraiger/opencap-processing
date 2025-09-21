@@ -3016,7 +3016,7 @@ def download_file_2(url, file_name):
     open(file_name, 'wb').write(response.content)
 
 def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
-                         cases=['default'], mainPlots=True):
+                         cases=['0'], mainPlots=True, output_path=None):
     
     # %% Load optimal trajectories.
     pathOSData = os.path.join(dataDir, 'OpenSimData')
@@ -3028,7 +3028,10 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
     c_tr = np.load(os.path.join(c_pathResults, 'optimaltrajectories.npy'),
                    allow_pickle=True).item()    
     optimaltrajectories = {}
-    fig_dir = os.path.join(c_pathResults, 'plots')
+    if output_path is None:
+        fig_dir = os.path.join(c_pathResults, 'plots')
+    else:
+        fig_dir = os.path.join(output_path, 'plots') 
     os.makedirs(fig_dir, exist_ok=True)
     for case in cases:
         optimaltrajectories[case] = c_tr[case]
@@ -3048,7 +3051,7 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
     nJoints = len(joints)
     rotationalJoints = optimaltrajectories[cases[0]]['rotationalCoordinates']
     ny = np.ceil(np.sqrt(nJoints))
-    fig, axs = plt.subplots(int(ny), int(ny))
+    fig, axs = plt.subplots(int(ny), int(ny), figsize=(10,10))
     fig.suptitle('Coordinate values', fontsize=fontsizeSubTitle, fontweight='bold')
     for i, ax in enumerate(axs.flat):
         if i < nJoints:
@@ -3099,7 +3102,7 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
     for i in range(0, mm):
         axs.flatten()[i].set_xticklabels([])
 
-    fig_path = os.path.join(fig_dir, 'joint_angles.png')
+    fig_path = os.path.join(fig_dir, 'joint_coordinates.png')
     plt.savefig(fig_path, bbox_inches='tight')
     if os.environ.get("DISPLAY","") != "":
         plt.show()
@@ -3215,7 +3218,7 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
         # Clean up ticks and labels.
         for i in range(0, mm):
             axs.flatten()[i].set_xticklabels([])
-        fig_path = os.path.join(fig_dir, 'joint_angles.png')
+        fig_path = os.path.join(fig_dir, 'joint_accelerations.png')
         plt.savefig(fig_path, bbox_inches='tight')
         if os.environ.get('DISPLAY', "")  != "":
             plt.show()
@@ -3264,7 +3267,7 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
     # Clean up ticks and labels.
     for i in range(0, mm):
         axs.flatten()[i].set_xticklabels([])
-    fig_path = os.path.join(fig_dir, 'joint_angles.png')
+    fig_path = os.path.join(fig_dir, 'joint_torques.png')
     plt.savefig(fig_path, bbox_inches='tight')
     if os.environ.get('DISPLAY', "")  != "": 
         plt.show()
@@ -3302,7 +3305,7 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
     fig.legend(handles, labels, loc='upper right', fontsize=fontsizeLegend)
     # Change subplot spacing.
     fig.subplots_adjust(hspace=0.4, wspace=0.4)
-    fig_path = os.path.join(fig_dir, 'joint_angles.png')
+    fig_path = os.path.join(fig_dir, 'ground_reaction_forces.png')
     plt.savefig(fig_path, bbox_inches='tight')
     if os.environ.get('DISPLAY', "")  != "":
         plt.show()
@@ -3341,7 +3344,7 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
         fig.legend(handles, labels, loc='upper right', fontsize=fontsizeLegend)
         # Change subplot spacing.
         fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        fig_path = os.path.join(fig_dir, 'joint_moments.png')
+        fig_path = os.path.join(fig_dir, 'ground_reaction_moments.png')
         plt.savefig(fig_path, bbox_inches='tight')
         if os.environ.get('DISPLAY', "")  != "":
             plt.show()
@@ -3401,7 +3404,7 @@ def plotResultsOpenSimAD_custom(dataDir, motion_filename, settings,
     # Clean up ticks and labels.
     for i in range(0, mm):
         axs.flatten()[i].set_xticklabels([])
-    fig_path = os.path.join(fig_dir, 'joint_moments.png')
+    fig_path = os.path.join(fig_dir, 'muscle_activations.png')
     plt.savefig(fig_path, bbox_inches='tight')
     if os.environ.get('DISPLAY', "")  != "":
         plt.show()

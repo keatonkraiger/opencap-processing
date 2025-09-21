@@ -86,10 +86,12 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
 
     # Get metadata
     metadata = import_metadata(os.path.join(dataFolder, 'sessionMetadata.yaml'))
-    OpenSimModel = metadata['openSimModel']
+    generic_model = metadata.get('generic_openSimModel', 'LaiUhlrich2022_Vicon_39')
+    scaled_model = metadata.get('scaled_openSimModel', 'LaiUhlrich2022_Vicon_39_scaled')
+    
     
     # TODO: support new shoulder model
-    if 'shoulder' in OpenSimModel:
+    if 'shoulder' in generic_model:
         raise ValueError("""
          The full body model with the ISB shoulder is not yet supported for
          dynamic simulations (https://github.com/stanfordnmbl/opencap-processing/issues/61).
@@ -97,26 +99,26 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
     
     # Prepare inputs for dynamic simulations.
     # Adjust muscle wrapping.    
-    adjust_muscle_wrapping_custom(baseDir, dataFolder ,
-                         OpenSimModel=OpenSimModel, overwrite=True)
-    
+    adjust_muscle_wrapping_custom(baseDir, dataFolder , generic_OpenSimModel=generic_model,
+                                    scaled_OpenSimModel=scaled_model, overwrite=overwrite)
+   
     # Add foot-ground contacts to musculoskeletal model.    
     if multiple_contacts: 
         generate_model_with_multiple_contacts_custom(dataFolder,
-                                OpenSimModel=OpenSimModel, overwrite=overwrite,
+                                OpenSimModel=scaled_model, overwrite=overwrite,
                                 contact_side=contact_side, marker_data=marker_data)
     else:
         generate_model_with_contacts_custom(dataFolder,
-                                OpenSimModel=OpenSimModel, overwrite=overwrite,
+                                OpenSimModel=scaled_model, overwrite=overwrite,
                                 contact_side=contact_side)
-    
+   
     # Generate external function.    
     generateExternalFunction_custom(baseDir, dataFolder,
-                             OpenSimModel=OpenSimModel,
+                             OpenSimModel=scaled_model,
                              overwrite=overwrite, 
                              treadmill=bool(treadmill_speed),
                              contact_side=contact_side,
-                             useExpressionGraphFunction=useExpressionGraphFunction)
+                             useExpressionGraphFunction=useExpressionGraphFunction, multiple_contacts=multiple_contacts)
     
     # Get settings.
     settings = get_setup(motion_type)
@@ -157,7 +159,7 @@ def processInputsOpenSimAD_custom(baseDir, dataFolder, session_id, trial_name,
     settings['height_m'] = metadata['height_m']
     settings['treadmill_speed'] = treadmill_speed
     settings['trial_name'] = trial_name
-    settings['OpenSimModel'] = OpenSimModel
+    settings['OpenSimModel'] = scaled_model
     settings['useExpressionGraphFunction'] = useExpressionGraphFunction
     settings['contact_side'] = contact_side
     return settings
@@ -251,7 +253,7 @@ def generate_model_with_multiple_contacts_custom(
         raise ValueError('side must be "all", "right", or "left"')
     
     if contact_side == 'all':
-        pathOutputModel = pathOutputFiles + "_multi_contacts.osim"
+        pathOutputModel = pathOutputFiles + "_multiple_contacts.osim"
     else:
         pathOutputModel = pathOutputFiles + "_contacts_" + contact_side + ".osim"
     
@@ -513,7 +515,8 @@ def generate_model_with_contacts_custom(
     model.printToXML(pathOutputModel)
     
 def adjust_muscle_wrapping_custom(
-        baseDir, dataDir, OpenSimModel="LaiUhlrich2022_Vicon_39",
+        baseDir, dataDir, generic_OpenSimModel="LaiUhlrich2022_Vicon_39",
+        scaled_OpenSimModel="LaiUhlrich2022_Vicon_39_scaled",
         overwrite=True):
     # Paths
     osDir = os.path.join(dataDir, 'OpenSimData')
@@ -522,23 +525,21 @@ def adjust_muscle_wrapping_custom(
     # We changed the OpenSim model name after some time:
     # from LaiArnoldModified2017_poly_withArms_weldHand to LaiUhlrich2022.
     # This is a hack for backward compatibility.
-    if OpenSimModel == 'LaiArnoldModified2017_poly_withArms_weldHand':
-        unscaledModelName = 'LaiUhlrich2022'
-    else:
-        unscaledModelName = OpenSimModel
+    if generic_OpenSimModel == 'LaiArnoldModified2017_poly_withArms_weldHand':
+        generic_OpenSimModel = 'LaiUhlrich2022'
     
     pathUnscaledModel = os.path.join(baseDir, 'OpenSimPipeline', 'Models',
-                                     unscaledModelName + '.osim')
+                                     generic_OpenSimModel + '.osim')
     pathScaledModel = os.path.join(pathModelFolder,
-                                   OpenSimModel + '_scaled.osim')
+                                   scaled_OpenSimModel + '.osim')
     pathOutputModel = os.path.join(pathModelFolder,
-                                   OpenSimModel + '_scaled_adjusted.osim')
+                                   scaled_OpenSimModel + '_scaled_adjusted.osim')
     
     if overwrite is False and os.path.exists(pathOutputModel):
         return
     else:
         print('Adjust muscle wrapping surfaces.')
-        
+       
     # Set up logging.
     logPath = os.path.join(pathModelFolder,'modelAdjustment.log')
     if os.path.exists(logPath):
@@ -775,7 +776,7 @@ def generateExternalFunction_custom(
         OpenSimModel="LaiUhlrich2022",
         treadmill=False, build_externalFunction=True, verifyID=True, 
         externalFunctionName='F', overwrite=False,
-        useExpressionGraphFunction=True, contact_side='all'):
+        useExpressionGraphFunction=True, contact_side='all', multiple_contacts=False):
 
     # %% Process settings.
     pathCWD = os.getcwd()
@@ -785,7 +786,10 @@ def generateExternalFunction_custom(
     if contact_side != 'all':
         suffix_model = '_contacts_' + contact_side
     else:
-        suffix_model = '_contacts'
+        if multiple_contacts:
+            suffix_model = '_multiple_contacts'
+        else:
+            suffix_model = '_contacts'
     outputModelFileName = (OpenSimModel + "_scaled" + suffix_MA + suffix_model)
     pathModel = os.path.join(pathModelFolder, outputModelFileName + ".osim")
     pathOutputExternalFunctionFolder = os.path.join(pathModelFolder,
@@ -821,8 +825,8 @@ def generateExternalFunction_custom(
         return      
     else:
         print('Generate external function to leverage automatic differentiation.')
-    
-    # %% Generate external Function (.cpp file)
+   
+    # Generate C++ code for the external function. 
     opensim.Logger.setLevelString('error')
     model = opensim.Model(pathModel)
     model.initSystem()
