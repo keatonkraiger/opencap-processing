@@ -1238,7 +1238,6 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
             Qdds_mocap_spline_filter, timeIntervals[0], 
             timeIntervals[1], N).to_numpy()[:,1::].T
             
-    # %% Update bounds if coordinate constraints.
     if coordinate_constraints:
         # TODO: not sure why bounds at collocation points not updated (Antoine).
         # from utilsOpenSimAD import getColfromk
@@ -1267,8 +1266,6 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
                 # lbQsj_vec[joints.index(cons),:] = -coordinate_constraints[cons]['env_bound'] / scaling['Qs'].iloc[0][cons] + c_sc_j
         uw['Qsk'] = ca.vec(ubQsk_vec).full()
         lw['Qsk'] = ca.vec(lbQsk_vec).full()
-        # uw['Qsj'] = ca.vec(ubQsj_vec).full()
-        # lw['Qsj'] = ca.vec(lbQsj_vec).full()
         
     if solveProblem:
         J = 0 # initialize cost function.
