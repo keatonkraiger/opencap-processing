@@ -298,7 +298,7 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
     # differences between using a tolerance of 3 and 4, and therefore set it
     # to 3, since it converges faster. Nevertheless, we set it here to 4 by
     # default.
-    ipopt_tolerance = 4
+    ipopt_tolerance = 3
     if 'ipopt_tolerance' in settings:
         ipopt_tolerance = settings['ipopt_tolerance']
 
@@ -1867,6 +1867,7 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
         np.save(os.path.join(pathResults, 'stats_{}.npy'.format(case)), stats)
         if output_dir:
             solve_path = os.path.join(output_dir, 'solve_logs')
+            os.makedirs(solve_path, exist_ok=True)  
             np.save(os.path.join(solve_path, 'w_opt_{}.npy'.format(case)), w_opt)
             np.save(os.path.join(solve_path, 'stats_{}.npy'.format(case)), stats)
             

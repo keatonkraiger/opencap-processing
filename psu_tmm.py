@@ -102,9 +102,9 @@ def main(args):
             marker_data[marker] = markers[marker][indices, :]
     else:
         marker_data = None
-        
-    
-    solveProblem = True
+
+
+    solveProblem = not args.no_solve
     analyzeResults = True
     repetition = None
     treadmill_speed = 0
@@ -137,11 +137,11 @@ def main(args):
     # Save settings 
     with open(os.path.join(output_dir, 'settings.pkl'), 'wb') as f:
         pickle.dump(settings, f)
- 
+
     run_tracking_custom(baseDir, data_path, session_id, settings, case=case, 
                 solveProblem=solveProblem, analyzeResults=analyzeResults, output_dir=output_dir)
     # To compare different cases, add to the cases list, eg cases=['0','1'].
-    plotResultsOpenSimAD_custom(data_path, session_id, trial_name, settings, cases=[case], output_path=output_dir)
+    plotResultsOpenSimAD_custom(data_path, session_id, settings, cases=[case], output_path=output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run OpenSimAD simulations.')
@@ -156,5 +156,7 @@ if __name__ == "__main__":
                         help="Use marker data to position contact planes")
     parser.add_argument('--no_overwrite', action='store_true',
                         help="Do not overwrite existing results") 
+    parser.add_argument('--no_solve', action='store_true',
+                        help="Do not solve the optimization problem, only analyze existing results")
     args = parser.parse_args()
     main(args)
