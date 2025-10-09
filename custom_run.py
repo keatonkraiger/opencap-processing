@@ -134,7 +134,7 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
         if 'meshDensity' in settings:
             meshDensity = settings['meshDensity']
         N = int(round(timeElapsed * meshDensity, 2))
-        
+       
     # Discretized time interval.
     tgrid = np.linspace(timeIntervals[0], timeIntervals[1], N+1)
     tgridf = np.zeros((1, N+1))
@@ -1867,6 +1867,7 @@ def run_tracking_custom(baseDir, dataDir, subject, settings, case='0',
         np.save(os.path.join(pathResults, 'stats_{}.npy'.format(case)), stats)
         if output_dir:
             solve_path = os.path.join(output_dir, 'solve_logs')
+            os.makedirs(solve_path, exist_ok=True)
             np.save(os.path.join(solve_path, 'w_opt_{}.npy'.format(case)), w_opt)
             np.save(os.path.join(solve_path, 'stats_{}.npy'.format(case)), stats)
             

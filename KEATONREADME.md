@@ -12,6 +12,12 @@ I've put a small snippet of subject 7 take 2's taiji in Data. You can run their 
 python psu_tmm.py --data_path Data/PSUTMM/Subject7/Take_2 --session_id Take_2_segment_4 --start_time 192 --stop_time 198 --multiple_contacts --use_marker_contact  
 ```
 
+There is also subject 7 take 2's data downsampled to 10hz.
+
+```
+python psu_tmm.py --data_path Data/PSUTMM/Subject7/Take_2 --session_id Take_2_10hz --multiple_contacts --use_marker_contact --start_time x --stop_time y
+```
+
 See the arguments in the file to see some of the options I've included. its mostly hardcoded now.
 
 ## Extracting GRF results

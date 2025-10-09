@@ -4,6 +4,7 @@ import pickle
 import sys
 import argparse
 import time
+import shutil as sh
 
 baseDir = os.getcwd()
 opensimADDir = os.path.join(baseDir, 'UtilsDynamicSimulations', 'OpenSimAD')
@@ -11,7 +12,7 @@ sys.path.append(baseDir)
 sys.path.append(opensimADDir)
 
 
-from utilsOpenSimAD import plotResultsOpenSimAD, plotResultsOpenSimAD_custom
+from utilsOpenSimAD import plotResultsOpenSimAD_custom
 from custom_functions import processInputsOpenSimAD_custom, load_trc
 from custom_run import run_tracking_custom
 
@@ -86,6 +87,7 @@ def main(args):
     time_window = [args.start_time, args.stop_time]
     data_path = args.data_path
     overwrite = not args.no_overwrite
+    input_hz = args.input_hz
      
     if args.use_marker_contact:
         # Load the trc file
@@ -118,15 +120,17 @@ def main(args):
         "repetition": repetition,
         "treadmill_speed": treadmill_speed,
         "contact_side": contact_side,
-        "multiple_contacts": args.multiple_contacts
+        "multiple_contacts": args.multiple_contacts,
     }
     for key, value in session_details.items():
         print(f"{key}: {value}")
-     
+
+    # Create output directory
     output_dir = os.path.join('Results', data_path)
     if time_window:
         output_dir += f'/{int(time_window[0])}-{int(time_window[1])}s'
     os.makedirs(output_dir, exist_ok=True)
+    
     start_time = time.time() 
     settings = processInputsOpenSimAD_custom(baseDir, data_path, session_id, trial_name, 
                                     motion_type, time_window, repetition, 
@@ -134,14 +138,22 @@ def main(args):
 
     settings['session_details'] = session_details
     settings['start_time'] = start_time
+    # N = time elapsed * data hz
+    settings['N'] = int(round((time_window[1]-time_window[0]) * input_hz, 2))
+    settings['torque_driven_model'] = args.torque_driven_model
     # Save settings 
     with open(os.path.join(output_dir, 'settings.pkl'), 'wb') as f:
         pickle.dump(settings, f)
- 
+    
     run_tracking_custom(baseDir, data_path, session_id, settings, case=case, 
                 solveProblem=solveProblem, analyzeResults=analyzeResults, output_dir=output_dir)
+       
+    # Copy the OpenSimData to the output folder
+    osim_dir = os.path.join(baseDir, data_path, session_id, 'OpenSimData')
+    sh.copytree(osim_dir, os.path.join(output_dir, 'OpenSimData'), dirs_exist_ok=True)
+     
     # To compare different cases, add to the cases list, eg cases=['0','1'].
-    plotResultsOpenSimAD_custom(data_path, session_id, trial_name, settings, cases=[case], output_path=output_dir)
+    plotResultsOpenSimAD_custom(data_path, session_id, settings, output_path=output_dir, cases=['0'])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run OpenSimAD simulations.')
@@ -156,5 +168,9 @@ if __name__ == "__main__":
                         help="Use marker data to position contact planes")
     parser.add_argument('--no_overwrite', action='store_true',
                         help="Do not overwrite existing results") 
+    parser.add_argument('--input_hz', type=float, default=50.0,
+                        help="Hz of input data. Default is 50Hz")
+    parser.add_argument('--torque_driven_model', action='store_true',
+                        help="Use a torque driven model instead of muscle driven")
     args = parser.parse_args()
     main(args)

@@ -757,7 +757,7 @@ def extract_dynamics(results_path, display_plot=True, save_plots=False, output_d
     return extracted_data
 
 if __name__ == '__main__':
-    results_path = 'Data/Extracted_Data/S7_T2/optimaltrajectories.npy'
+    results_path = '/scratch/kbk5531/Research/Bio/opencap-processing/Results/Data/PSUTMM/Subject7/Take_2/193-195s/optimaltrajectories.npy'
     
     # Extract and plot data
     data = extract_dynamics(results_path, display_plot=False, save_plots=True)
