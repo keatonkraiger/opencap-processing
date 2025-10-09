@@ -9,13 +9,13 @@ Follow the README instructions on all the stuff you'll need to download. I would
 I've put a small snippet of subject 7 take 2's taiji in Data. You can run their pipeline with:
 
 ```
-python psu_tmm.py --data_path Data/PSUTMM/Subject7/Take_2 --session_id Take_2_segment_4 --start_time 192 --stop_time 198 --multiple_contacts --use_marker_contact  
+python psu_tmm.py --data_path Data/PSUTMM/Subject7/Take_2 --session_id Take_2_segment_4 --start_time 192 --stop_time 198 --multiple_contacts --use_marker_contact --torque_driven_model 
 ```
 
 There is also subject 7 take 2's data downsampled to 10hz.
 
 ```
-python psu_tmm.py --data_path Data/PSUTMM/Subject7/Take_2 --session_id Take_2_10hz --multiple_contacts --use_marker_contact --start_time x --stop_time y
+python psu_tmm.py --data_path Data/PSUTMM/Subject7/Take_2 --session_id Take_2_10hz --multiple_contacts --use_marker_contact --start_time x --stop_time y --torque_driven_model
 ```
 
 See the arguments in the file to see some of the options I've included. its mostly hardcoded now.
