@@ -155,6 +155,7 @@ def main(args):
     # To compare different cases, add to the cases list, eg cases=['0','1'].
     plotResultsOpenSimAD_custom(data_path, session_id, settings, output_path=output_dir, cases=['0'])
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run OpenSimAD simulations.')
     parser.add_argument('--data_path', type=str, default='',
